@@ -1,0 +1,18 @@
+
+group = "org.hedhman"
+version = "1.0"
+
+apply plugin: 'java'
+apply plugin: 'idea'
+
+repositories {
+  mavenCentral()
+  mavenLocal()
+}
+
+dependencies {
+
+  compile "org.apache.ant:ant:1.8.4"
+  testCompile "junit:junit:4.8.2"
+}
+
