@@ -19,12 +19,14 @@ package org.hedhman.blackadder.parser;
 
 import java.security.KeyStore;
 import java.security.Principal;
+import org.hedhman.blackadder.expander.ExpansionFailedException;
+import org.hedhman.blackadder.expander.GeneralExpansionHandler;
 
 /**
  * Specific handler for expanding <i>self</i> and <i>alias</i> protocols.
  */
 class PermissionExpander
-    implements PolicyUtils.GeneralExpansionHandler
+    implements GeneralExpansionHandler
 {
 
     // Store KeyStore
@@ -59,13 +61,11 @@ class PermissionExpander
      * where <i>DN</i> is a certificate's subject distinguished name.
      * </dl>
      *
-     * @throws ExpansionFailedException - if protocol is other than
-     *                                  <i>self</i> or <i>alias</i>, or if data resolution failed
+     * @throws org.hedhman.blackadder.expander.ExpansionFailedException - if protocol is other than <i>self</i> or <i>alias</i>, or if data resolution failed
      */
     public String resolve( String protocol, String data )
         throws ExpansionFailedException
     {
-
         if( "self".equals( protocol ) )
         {
             //need expanding to list of principals in grant clause

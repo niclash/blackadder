@@ -47,8 +47,6 @@ import java.util.Comparator;
  * HINT: Use a NavigableMap to return a reverse order iterator for
  * PermissionCollection's like SocketPermissionCollection and
  * FilePermissionCollection.
- *
- * @since 2.2.1
  */
 public class PermissionComparator implements Comparator<Permission>, Serializable
 {

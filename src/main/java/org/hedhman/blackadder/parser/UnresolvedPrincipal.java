@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/**
- *
- * @version $Revision$
- */
-
 package org.hedhman.blackadder.parser;
 
 import java.security.Principal;
@@ -35,7 +30,7 @@ import java.security.Principal;
  * acceptable principal and compares it with the actual principal.
  *
  * @see PermissionGrant
- * See {@code org.apache.river.api.security.ConcurrentPolicyFile}
+ * @see org.hedhman.blackadder.ConcurrentPolicyFile
  */
 final class UnresolvedPrincipal implements Principal
 {
@@ -85,6 +80,7 @@ final class UnresolvedPrincipal implements Principal
      * Returns fully qualified class name of a modeled Principal,
      * or wildcard if any class is acceptable.
      */
+    @SuppressWarnings( "UnusedDeclaration" )
     public String getClassName()
     {
         return klass;

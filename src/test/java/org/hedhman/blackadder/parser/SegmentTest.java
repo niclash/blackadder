@@ -19,6 +19,7 @@
 package org.hedhman.blackadder.parser;
 
 import java.util.Properties;
+import org.hedhman.blackadder.expander.ExpansionFailedException;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -37,7 +38,7 @@ public class SegmentTest
     @Before
     public void setup()
     {
-        p = new Properties();
+        p = System.getProperties();
         p.setProperty( "java.ext.dirs", "tests:foo:bar:${jini.home}" );
         p.setProperty( "jini.home", "${river.apache.org}" );
         p.setProperty( "river.apache.org", "/opt/src/river" );
@@ -51,10 +52,10 @@ public class SegmentTest
         System.out.println( p.toString() );
         String policyGrantln = "file:${{java.ext.dirs}}/*";
         System.out.println( policyGrantln );
-        Segment seg = new Segment( policyGrantln, null );
+        Segment seg = new Segment( policyGrantln, null, System.getProperties() );
         String startMark = "${{";
         String endMark = "}}";
-        seg.divideAndReplace( startMark, endMark, ":", p );
+        seg.divideAndReplace( startMark, endMark, ":" );
         while( seg.hasNext() )
         {
             System.out.println( seg.next() );
@@ -69,11 +70,11 @@ public class SegmentTest
         System.out.println( p.toString() );
         String policyGrantln = "file:${{java.ext.dirs}}/*";
         System.out.println( policyGrantln );
-        Segment seg = new Segment( policyGrantln, null );
+        Segment seg = new Segment( policyGrantln, null, System.getProperties() );
         String startMark = "${{";
         String endMark = "}}";
-        seg.divideAndReplace( startMark, endMark, ":", p );
-        seg.divideAndReplace( "${", "}", null, p );
+        seg.divideAndReplace( startMark, endMark, ":" );
+        seg.divideAndReplace( "${", "}", null );
         while( seg.hasNext() )
         {
             System.out.println( seg.next() );
@@ -88,12 +89,12 @@ public class SegmentTest
         System.out.println( p.toString() );
         String policyGrantln = "file:${{java.ext.dirs}}/*";
         System.out.println( policyGrantln );
-        Segment seg = new Segment( policyGrantln, null );
+        Segment seg = new Segment( policyGrantln, null, System.getProperties() );
         String startMark = "${{";
         String endMark = "}}";
-        seg.divideAndReplace( startMark, endMark, ":", p );
-        seg.divideAndReplace( "${", "}", null, p );
-        seg.divideAndReplace( "${", "}", null, p );
+        seg.divideAndReplace( startMark, endMark, ":" );
+        seg.divideAndReplace( "${", "}", null );
+        seg.divideAndReplace( "${", "}", null );
         while( seg.hasNext() )
         {
             System.out.println( seg.next() );
@@ -108,10 +109,10 @@ public class SegmentTest
         System.out.println( p.toString() );
         String policyGrantln = "file:${jini.home}/*";
         System.out.println( policyGrantln );
-        Segment seg = new Segment( policyGrantln, null );
+        Segment seg = new Segment( policyGrantln, null, System.getProperties() );
         String startMark = "${";
         String endMark = "}";
-        seg.divideAndReplace( startMark, endMark, null, p );
+        seg.divideAndReplace( startMark, endMark, null );
         while( seg.hasNext() )
         {
             System.out.println( seg.next() );

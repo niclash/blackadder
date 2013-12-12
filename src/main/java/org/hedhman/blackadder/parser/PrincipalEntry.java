@@ -20,7 +20,7 @@ package org.hedhman.blackadder.parser;
 /**
  * Compound token representing <i>principal </i> entry of a <i>grant </i>
  * clause. See policy format
- * {@code org.apache.river.api.security.ConcurrentPolicyFile } description for details.
+ * {@link org.hedhman.blackadder.ConcurrentPolicyFile } description for details.
  *
  * @see DefaultPolicyParser
  * @see DefaultPolicyScanner

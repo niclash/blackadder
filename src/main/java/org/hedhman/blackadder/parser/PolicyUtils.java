@@ -23,21 +23,17 @@ import java.lang.reflect.InvocationTargetException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.security.AccessController;
 import java.security.Permission;
 import java.security.PermissionCollection;
 import java.security.Permissions;
-import java.security.Security;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
-import java.util.Properties;
 
 /**
  * This class consist of a number of static methods, which provide a common functionality
  * for various policy and configuration providers.
  */
-class PolicyUtils
+public class PolicyUtils
+    implements Constants
 {
 
     // No reason to instantiate
@@ -45,51 +41,7 @@ class PolicyUtils
     {
     }
 
-    /**
-     * Substitutes all entries like ${some.key}, found in specified string,
-     * for specified values.
-     * If some key is unknown, throws ExpansionFailedException.
-     *
-     * @param str        the string to be expanded
-     * @param properties available key-value mappings
-     *
-     * @return expanded string
-     *
-     * @throws ExpansionFailedException
-     */
-    public static String expand( String str, Properties properties )
-        throws ExpansionFailedException
-    {
-        final String START_MARK = "${";
-        final String END_MARK = "}";
-        final int START_OFFSET = START_MARK.length();
-        final int END_OFFSET = END_MARK.length();
-
-        StringBuilder result = new StringBuilder( str );
-        int start = result.indexOf( START_MARK );
-        while( start >= 0 )
-        {
-            int end = result.indexOf( END_MARK, start );
-            if( end >= 0 )
-            {
-                String key = result.substring( start + START_OFFSET, end );
-                String value = properties.getProperty( key );
-                if( value != null )
-                {
-                    result.replace( start, end + END_OFFSET, value );
-                    start += value.length();
-                }
-                else
-                {
-                    throw new ExpansionFailedException( "Unknown key: " + key );
-                }
-            }
-            start = result.indexOf( START_MARK, start );
-        }
-        return result.toString();
-    }
-
-//  Segment has a bug where if the closing bracket is missing it gets caught
+    //  Segment has a bug where if the closing bracket is missing it gets caught
 //  endlessly creating new Segments and calling them.
 //    public static String expand(String str, Properties properties) throws ExpansionFailedException{
 //        Segment s = new Segment(str, null);
@@ -99,18 +51,6 @@ class PolicyUtils
 //        s.hasNext(); // There will be at least one result
 //        return s.next(); // Don't bother checking for more, not split into array.
 //    }
-
-    /**
-     * Handy shortcut for
-     * <code>expand(str, properties).replace(File.separatorChar, '/')</code>.
-     *
-     * @see #expand(String, java.util.Properties)
-     */
-    static String expandURL( String str, Properties properties )
-        throws ExpansionFailedException
-    {
-        return expand( str, properties ).replace( File.separatorChar, '/' );
-    }
 
     /**
      * Normalizes URLs to standard ones, eliminating pathname symbols.
@@ -193,228 +133,6 @@ class PolicyUtils
     }
 
     /**
-     * Instances of this interface are intended for resolving
-     * generalized expansion expressions, of the form ${{protocol:data}}.
-     * Such functionality is applicable to security policy files, for example.
-     * See {@code org.apache.harmony.security.PolicyUtils#expandGeneral(String, GeneralExpansionHandler) }
-     */
-    static interface GeneralExpansionHandler
-    {
-
-        /**
-         * Resolves general expansion expressions of the form ${{protocol:data}}.
-         *
-         * @param protocol denotes type of resolution
-         * @param data     data to be resolved, optional (may be null)
-         *
-         * @return resolved value, must not be null
-         *
-         * @throws ExpansionFailedException if expansion is impossible
-         */
-        String resolve( String protocol, String data )
-            throws ExpansionFailedException;
-    }
-
-    /**
-     * Substitutes all entries like ${{protocol:data}}, found in specified string,
-     * for values resolved by passed handler.
-     * The data part may be empty, and in this case expression
-     * may have simplified form, as ${{protocol}}.
-     * If some entry cannot be resolved, throws ExpansionFailedException;
-     *
-     * @param str     the string to be expanded
-     * @param handler the handler to resolve data denoted by protocol
-     *
-     * @return expanded string
-     *
-     * @throws ExpansionFailedException
-     */
-    static String expandGeneral( String str,
-                                 GeneralExpansionHandler handler
-    )
-        throws ExpansionFailedException
-    {
-        final String START_MARK = "${{";
-        final String END_MARK = "}}";
-        final int START_OFFSET = START_MARK.length();
-        final int END_OFFSET = END_MARK.length();
-
-        StringBuilder result = new StringBuilder( str );
-        int start = result.indexOf( START_MARK );
-        while( start >= 0 )
-        {
-            int end = result.indexOf( END_MARK, start );
-            if( end >= 0 )
-            {
-                String key = result.substring( start + START_OFFSET, end );
-                int separator = key.indexOf( ':' );
-                String protocol = ( separator >= 0 ) ? key
-                    .substring( 0, separator ) : key;
-                String data = ( separator >= 0 ) ? key.substring( separator + 1 )
-                                                 : null;
-                String value = handler.resolve( protocol, data );
-                result.replace( start, end + END_OFFSET, value );
-                start += value.length();
-            }
-            start = result.indexOf( START_MARK, start );
-        }
-        return result.toString();
-    }
-
-    /**
-     * A key to security properties, deciding whether usage of
-     * dynamic policy location via system properties is allowed.
-     *
-     * @see #getPolicyURLs(java.util.Properties, String, String)
-     */
-    static final String POLICY_ALLOW_DYNAMIC = "policy.allowSystemProperty";
-
-    /**
-     * A key to security properties, deciding whether expansion of
-     * system properties is allowed
-     * (in security properties values, policy files, etc).
-     *
-     * @see #expand(String, java.util.Properties)
-     */
-    static final String POLICY_EXPAND = "policy.expandProperties";
-
-    /**
-     * Positive value of switching properties.
-     */
-//    static final String TRUE = "true";
-
-    /**
-     * Negative value of switching properties.
-     */
-    static final String FALSE = "false";
-
-    /**
-     * Returns false if current security settings disable to perform
-     * properties expansion, true otherwise.
-     *
-     * @see #expand(String, java.util.Properties)
-     */
-    static boolean canExpandProperties()
-    {
-        return !FALSE.equalsIgnoreCase( AccessController
-                                            .doPrivileged( new SecurityPropertyAccessor( POLICY_EXPAND ) ) );
-    }
-
-    /**
-     * Obtains a list of locations for a policy or configuration provider.
-     * The search algorithm is as follows:
-     * <ol>
-     * <li> Look in security properties for keys of form <code>prefix + n</code>,
-     * where <i>n</i> is an integer and <i>prefix</i> is a passed parameter.
-     * Sequence starts with <code>n=1</code>, and keeps incrementing <i>n</i>
-     * until next key is not found. <br>
-     * For each obtained key, try to construct an URL instance. On success,
-     * add the URL to the list; otherwise ignore it.
-     * <li>
-     * If security settings do not prohibit (through
-     * {@link #POLICY_ALLOW_DYNAMIC the &quot;policy.allowSystemProperty&quot; property})
-     * to use additional policy location, read the system property under the
-     * passed key parameter. If property exists, it may designate a file or
-     * an absolute URL. Thus, first check if there is a file with that name,
-     * and if so, convert the pathname to URL. Otherwise, try to instantiate
-     * an URL directly. If succeeded, append the URL to the list
-     * <li>
-     * If the additional location from the step above was specified to the
-     * system via &quot;==&quot; (i.e. starts with '='), discard all URLs above
-     * and use this only URL.
-     * </ol>
-     * <b>Note:</b> all property values (both security and system) related to URLs are
-     * subject to {@link #expand(String, java.util.Properties) property expansion}, regardless
-     * of the &quot;policy.expandProperties&quot; security setting.
-     *
-     * @param system            system properties
-     * @param systemUrlKey      key to additional policy location
-     * @param securityUrlPrefix prefix to numbered locations in security properties
-     *
-     * @return array of URLs to provider's configuration files, may be empty.
-     */
-    static URL[] getPolicyURLs( final Properties system,
-                                final String systemUrlKey, final String securityUrlPrefix
-    )
-    {
-
-        final List<URL> urls = new ArrayList<URL>();
-        boolean dynamicOnly = false;
-        URL dynamicURL = null;
-
-        //first check if policy is set via system properties
-        if( !FALSE.equalsIgnoreCase( Security.getProperty( POLICY_ALLOW_DYNAMIC ) ) )
-        {
-            String location = system.getProperty( systemUrlKey );
-            if( location != null )
-            {
-                if( location.startsWith( "=" ) )
-                {
-                    //overrides all other urls
-                    dynamicOnly = true;
-                    location = location.substring( 1 );
-                }
-                try
-                {
-                    location = expandURL( location, system );
-                    // location can be a file, but we need an url...
-                    final File f = new File( location );
-                    if( f.exists() )
-                    {
-                        dynamicURL = f.toURI().toURL();
-                    }
-                    if( dynamicURL == null )
-                    {
-                        dynamicURL = new URL( location );
-                    }
-                }
-                catch( Exception e )
-                {
-                    if( e instanceof SecurityException )
-                    {
-                        throw (SecurityException) e;
-                    }
-                    // TODO: log error
-                    System.err.println( "Error detecting system policy location: " + e );
-                }
-            }
-        }
-        //next read urls from security.properties 
-        if( !dynamicOnly )
-        {
-            int i = 1;
-            while( true )
-            {
-                String location = Security.getProperty( securityUrlPrefix + i++ );
-                if( location == null )
-                {
-                    break;
-                }
-                try
-                {
-                    location = expandURL( location, system );
-                    URL anURL = new URL( location );
-                    urls.add( anURL );
-                }
-                catch( Exception e )
-                {
-                    if( e instanceof SecurityException )
-                    {
-                        throw (SecurityException) e;
-                    }
-                    // TODO: log error
-                    System.err.println( "Error detecting security policy location: " + e );
-                }
-            }
-        }
-        if( dynamicURL != null )
-        {
-            urls.add( dynamicURL );
-        }
-        return urls.toArray( new URL[ urls.size() ] );
-    }
-
-    /**
      * Converts common-purpose collection of Permissions to PermissionCollection.
      *
      * @param perms a collection containing arbitrary permissions, may be null
@@ -422,8 +140,7 @@ class PolicyUtils
      * @return mutable heterogeneous PermissionCollection containing all Permissions
      * from the specified collection
      */
-    static PermissionCollection
-    toPermissionCollection( Collection<Permission> perms )
+    static PermissionCollection toPermissionCollection( Collection<Permission> perms )
     {
         PermissionCollection pc = new Permissions();
         if( perms != null )

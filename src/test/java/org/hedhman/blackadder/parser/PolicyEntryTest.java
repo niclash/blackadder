@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/**
- *
- * @version $Revision$
- */
-
 package org.hedhman.blackadder.parser;
 
 import java.security.AllPermission;
@@ -96,7 +91,7 @@ public class PolicyEntryTest extends TestCase
             new UnresolvedPrincipal( "e.f.g", "ZZZ" )
         };
 
-        assertFalse( pe.implies( (CodeSource) null, (Principal[]) null ) );
+        assertFalse( pe.implies( (CodeSource) null, null ) );
         assertFalse( pe.implies( (CodeSource) null, pp1 ) ); //originally  assert true.
 
 //        pe = new PolicyEntry((CodeSource)null, new HashSet<Principal>(),
@@ -107,7 +102,7 @@ public class PolicyEntryTest extends TestCase
 //        pe = new PolicyEntry((CodeSource) null, Arrays.asList(pp2),
 //                (Collection<Permission>) null);
         pe = pgb.principals( pp2 ).build(); //Builder still contains empty Permission[]
-        assertFalse( pe.implies( (CodeSource) null, (Principal[]) null ) );
+        assertFalse( pe.implies( (CodeSource) null, null ) );
         assertFalse( pe.implies( (CodeSource) null, pp1 ) );
         assertFalse( pe.implies( (CodeSource) null, pp3 ) ); //originally assert true.
     }

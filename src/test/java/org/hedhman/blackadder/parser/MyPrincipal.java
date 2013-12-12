@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/**
-* 
-* @version $Revision$
-*/
-
 package org.hedhman.blackadder.parser;
 
 import java.io.Serializable;

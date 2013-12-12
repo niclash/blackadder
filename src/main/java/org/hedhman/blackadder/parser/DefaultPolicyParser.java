@@ -40,6 +40,8 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.StringTokenizer;
+import org.hedhman.blackadder.expander.ExpansionFailedException;
+import org.hedhman.blackadder.expander.PropertyExpander;
 
 /**
  * This is a basic loader of policy files. It delegates lexical analysis to
@@ -47,7 +49,7 @@ import java.util.StringTokenizer;
  * {@link org.hedhman.blackadder.parser.PermissionGrant PermissionGrant}.
  * For details of policy format, which should be identical to Sun's Java Policy
  * files see the
- * {@code ConcurrentPolicyFile default policy description}.
+ * {@link org.hedhman.blackadder.ConcurrentPolicyFile} default policy description.
  * <br>
  * For ordinary uses, this class has just one public method <code>parse()</code>,
  * which performs the main task.
@@ -57,16 +59,22 @@ import java.util.StringTokenizer;
  * This implementation is effectively thread-safe, as it has no field references
  * to data being processed (that is, passes all the data as method parameters).
  *
- * See {@code org.apache.river.api.security.ConcurrentPolicyFile}
- * See {@code org.apache.river.api.security.parser.DefaultPolicyScanner}
- * @see org.hedhman.blackadder.parser.PermissionGrant
+ * @see org.hedhman.blackadder.ConcurrentPolicyFile
+ * @see DefaultPolicyScanner
+ * @see PermissionGrant
  */
-class DefaultPolicyParser
+public class DefaultPolicyParser
     implements PolicyParser
 {
+    private static final String ARRAY_START_MARK = "${{";
+    private static final String ARRAY_END_MARK = "}}";
+    private static final String ARRAY_SEPARATOR = System.getProperty( "path.separator" );
+    private static final String START_MARK = "${";
+    private static final String END_MARK = "}";
 
     // Pluggable scanner for a specific file format
     private final DefaultPolicyScanner scanner;
+    private final PropertyExpander propertyExpander;
 
     /**
      * Default constructor,
@@ -75,15 +83,16 @@ class DefaultPolicyParser
      */
     public DefaultPolicyParser()
     {
-        this( new DefaultPolicyScanner() );
+        this( new DefaultPolicyScanner(), System.getProperties() );
     }
 
     /**
      * Extension constructor for plugging-in custom scanner.
      */
-    DefaultPolicyParser( DefaultPolicyScanner s )
+    DefaultPolicyParser( DefaultPolicyScanner s, Properties properties )
     {
         this.scanner = s;
+        this.propertyExpander = new PropertyExpander( properties );
     }
 
     /**
@@ -97,16 +106,15 @@ class DefaultPolicyParser
      * valid reference is initialized and used in processing tokens.
      *
      * @param location an URL of a policy file to be loaded
-     * @param system   system properties, used for property expansion
      *
      * @return a collection of PermissionGrant objects, may be empty
      *
      * @throws Exception IO error while reading location or file syntax error
      */
-    public Collection<PermissionGrant> parse( URL location, Properties system )
+    public Collection<PermissionGrant> parse( URL location )
         throws Exception
     {
-        boolean resolve = PolicyUtils.canExpandProperties();
+        boolean resolve = propertyExpander.canExpandProperties();
         Reader r = new BufferedReader( new InputStreamReader(
             AccessController
                 .doPrivileged( new URLLoader( location ) ) ) );
@@ -124,14 +132,14 @@ class DefaultPolicyParser
         }
 
         //XXX KeyStore could be loaded lazily...
-        KeyStore ks = initKeyStore( keystores, location, system, resolve );
+        KeyStore ks = initKeyStore( keystores, location, resolve );
 
         Collection<PermissionGrant> result = new HashSet<PermissionGrant>();
         for( GrantEntry ge : grantEntries )
         {
             try
             {
-                PermissionGrant pe = resolveGrant( ge, ks, system, resolve );
+                PermissionGrant pe = resolveGrant( ge, ks, resolve );
                 if( !pe.isVoid() )
                 {
                     result.add( pe );
@@ -164,7 +172,7 @@ class DefaultPolicyParser
      * as UnresolvedPrincipal.
      * <li> Iterate over <code>permissions</code> collection. For each PermissionEntry,
      * try to resolve (see method
-     * {@link #resolvePermission(PermissionEntry, org.hedhman.blackadder.parser.GrantEntry, java.security.KeyStore, java.util.Properties, boolean) resolvePermission()})
+     * {@link #resolvePermission(PermissionEntry, GrantEntry, java.security.KeyStore, boolean) resolvePermission()})
      * a corresponding permission. If resolution failed, ignore the PermissionEntry.
      * </ul>
      * In fact, property expansion in the steps above is conditional and is ruled by
@@ -175,7 +183,6 @@ class DefaultPolicyParser
      *
      * @param ge      GrantEntry token to be resolved
      * @param ks      KeyStore for resolving Certificates, may be <code>null</code>
-     * @param system  system properties, used for property expansion
      * @param resolve flag enabling/disabling property expansion
      *
      * @return resolved PermissionGrant
@@ -186,7 +193,7 @@ class DefaultPolicyParser
      * @see PermissionEntry
      * @see PolicyUtils
      */
-    PermissionGrant resolveGrant( GrantEntry ge, KeyStore ks, Properties system, boolean resolve)
+    PermissionGrant resolveGrant( GrantEntry ge, KeyStore ks, boolean resolve)
         throws Exception
     {
         if( ge == null )
@@ -204,7 +211,7 @@ class DefaultPolicyParser
         Certificate[] signers = null;
         Set<Principal> principals = new HashSet<Principal>();
         Set<Permission> permissions = new HashSet<Permission>();
-        String cb = ge.getCodebase( null );
+        String cb = ge.getCodebase( propertyExpander );
         String signerString = ge.getSigners();
         if( cb != null )
         {
@@ -212,7 +219,7 @@ class DefaultPolicyParser
             {
                 try
                 {
-                    for( String aCbstr : expandURLs( cb, system ) )
+                    for( String aCbstr : expandURLs( cb ) )
                     {
                         codebases.add( getURI( aCbstr ) );
                     }
@@ -231,7 +238,7 @@ class DefaultPolicyParser
         {
             if( resolve )
             {
-                signerString = PolicyUtils.expand( signerString, system );
+                signerString = propertyExpander.expand( signerString );
             }
             signers = resolveSigners( ks, signerString );
         }
@@ -243,7 +250,7 @@ class DefaultPolicyParser
                 String principalClass = pe.getKlass();
                 if( resolve )
                 {
-                    principalName = PolicyUtils.expand( principalName, system );
+                    principalName = propertyExpander.expand( principalName );
                 }
                 if( principalClass == null )
                 {
@@ -262,7 +269,7 @@ class DefaultPolicyParser
             {
                 try
                 {
-                    permissions.add( resolvePermission( pe, ge, ks, system, resolve ) );
+                    permissions.add( resolvePermission( pe, ge, ks, resolve ) );
                 }
                 catch( Exception e )
                 {
@@ -301,28 +308,23 @@ class DefaultPolicyParser
         return new URI( uriString );
     }
 
-    Segment segment( String s, Properties p )
+    Segment segment( String s )
         throws ExpansionFailedException
     {
-        final String ARRAY_START_MARK = "${{";
-        final String ARRAY_END_MARK = "}}";
-        final String ARRAY_SEPARATOR = p.getProperty( "path.separator" );
-        final String START_MARK = "${";
-        final String END_MARK = "}";
-        Segment primary = new Segment( s, null );
+        Segment primary = new Segment( s, null, System.getProperties() );
         primary.divideAndReplace( ARRAY_START_MARK, ARRAY_END_MARK,
-                                  ARRAY_SEPARATOR, p );
-        primary.divideAndReplace( START_MARK, END_MARK, null, p );
+                                  ARRAY_SEPARATOR );
+        primary.divideAndReplace( START_MARK, END_MARK, null );
         // Repeat twice for nested properties
-        primary.divideAndReplace( START_MARK, END_MARK, null, p );
-        primary.divideAndReplace( START_MARK, END_MARK, null, p );
+        primary.divideAndReplace( START_MARK, END_MARK, null );
+        primary.divideAndReplace( START_MARK, END_MARK, null );
         return primary;
     }
 
-    Collection<String> expandURLs( String s, Properties p )
+    Collection<String> expandURLs( String s )
         throws ExpansionFailedException
     {
-        Segment seg = segment( s, p );
+        Segment seg = segment( s );
         Collection<String> urls = new ArrayList<String>();
         while( seg.hasNext() )
         {
@@ -344,7 +346,6 @@ class DefaultPolicyParser
      * @param pe      PermissionEntry token to be resolved
      * @param ge      parental GrantEntry of the PermissionEntry
      * @param ks      KeyStore for resolving Certificates, may be <code>null</code>
-     * @param system  system properties, used for property expansion
      * @param resolve flag enabling/disabling property expansion
      *
      * @return resolved Permission object, either of concrete class or UnresolvedPermission
@@ -355,30 +356,32 @@ class DefaultPolicyParser
      */
     Permission resolvePermission(
         PermissionEntry pe,
-        GrantEntry ge, KeyStore ks, Properties system,
+        GrantEntry ge, KeyStore ks,
         boolean resolve
     )
         throws Exception
     {
-        String className = pe.getKlass(), name = pe.getName(),
-            actions = pe.getActions(), signer = pe.getSigners();
+        String className = pe.getKlass();
+        String name = pe.getName();
+        String actions = pe.getActions();
+        String signer = pe.getSigners();
         if( name != null )
         {
-            name = PolicyUtils.expandGeneral( name, new PermissionExpander( ge, ks ) );
+            name = propertyExpander.expandGeneral( name, new PermissionExpander( ge, ks ) );
         }
         if( resolve )
         {
             if( name != null )
             {
-                name = PolicyUtils.expand( name, system );
+                name = propertyExpander.expand( name );
             }
             if( actions != null )
             {
-                actions = PolicyUtils.expand( actions, system );
+                actions =propertyExpander.expand( actions );
             }
             if( signer != null )
             {
-                signer = PolicyUtils.expand( signer, system );
+                signer = propertyExpander.expand( signer );
             }
         }
         Certificate[] signers = ( signer == null ) ? null : resolveSigners(
@@ -476,13 +479,12 @@ class DefaultPolicyParser
      *
      * @param keystores list of available KeystoreEntries
      * @param base      the policy file location
-     * @param system    system properties, used for property expansion
      * @param resolve   flag enabling/disabling property expansion
      *
      * @return the first successfully loaded KeyStore or <code>null</code>
      */
     KeyStore initKeyStore( List<KeystoreEntry> keystores,
-                           URL base, Properties system, boolean resolve
+                           URL base, boolean resolve
     )
     {
         for( KeystoreEntry keystore : keystores )
@@ -493,10 +495,10 @@ class DefaultPolicyParser
                 String type = keystore.getType();
                 if( resolve )
                 {
-                    url = PolicyUtils.expandURL( url, system );
+                    url = propertyExpander.expandURL( url );
                     if( type != null )
                     {
-                        type = PolicyUtils.expand( type, system );
+                        type = propertyExpander.expand( type );
                     }
                 }
                 if( type == null || type.length() == 0 )

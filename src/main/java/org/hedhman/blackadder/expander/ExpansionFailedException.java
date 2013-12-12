@@ -15,20 +15,20 @@
  *  limitations under the License.
  */
 
-package org.hedhman.blackadder.parser;
+package org.hedhman.blackadder.expander;
 
 /**
  * Specific exception to signal that property expansion failed
  * due to unknown key.
  */
-class ExpansionFailedException extends Exception
+public class ExpansionFailedException extends Exception
 {
     private static final long serialVersionUID = 1L;
 
     /**
      * Constructor with user-friendly message parameter.
      */
-    ExpansionFailedException( String message )
+    public ExpansionFailedException( String message )
     {
         super( message );
     }
@@ -36,7 +36,7 @@ class ExpansionFailedException extends Exception
     /**
      * Constructor with user-friendly message and causing error.
      */
-    ExpansionFailedException( String message, Throwable cause )
+    public ExpansionFailedException( String message, Throwable cause )
     {
         super( message, cause );
     }

@@ -19,6 +19,7 @@
 package org.hedhman.blackadder.parser;
 
 import java.util.Properties;
+import org.hedhman.blackadder.expander.ExpansionFailedException;
 
 /**
  * Segments form a chain of String parts which represent a framework for
@@ -42,6 +43,7 @@ class Segment
     implements Comparable<Segment>
 {
     private Segment previous;
+    private final Properties properties;
     private Segment[] divisions;
     private String original;
     //    private int length = 0;
@@ -50,9 +52,10 @@ class Segment
     private StringBuilder sb;
     private boolean toggle;
 
-    public Segment( String s, Segment preceed )
+    public Segment( String s, Segment preceed, Properties properties )
     {
         previous = preceed;
+        this.properties = properties;
         stat = Status.STRING;
         divisions = null;
         original = s;
@@ -170,7 +173,7 @@ class Segment
         return sequence;
     }
 
-    public int compareTo( Segment other )
+    public int compareTo( @SuppressWarnings( "NullableProblems" ) Segment other )
     {
         if( this.sequenceNumber() == other.sequenceNumber() )
         {
@@ -187,22 +190,19 @@ class Segment
      * Segments the current String by find Properties between the START_MARK and
      * END_MARK and replacing them with their values, splitting them into separate
      * Strings (that remain encapsulated in the Segment) if regex is non null.
-     *
      */
-    public void divideAndReplace( String START_MARK, String END_MARK,
-                                  String regex, Properties p
-    )
+    public void divideAndReplace( String START_MARK, String END_MARK, String regex )
         throws ExpansionFailedException
     {
         if( previous != null )
         {
-            previous.divideAndReplace( START_MARK, END_MARK, regex, p );
+            previous.divideAndReplace( START_MARK, END_MARK, regex );
         }
         if( divisions != null )
         {
             for( Segment division : divisions )
             {
-                division.divideAndReplace( START_MARK, END_MARK, regex, p );
+                division.divideAndReplace( START_MARK, END_MARK, regex );
             }
             // If divisions exist, then this Segment has already been processed.
             return;
@@ -219,17 +219,17 @@ class Segment
             Segment seg;
             if( start > beginning && beginning >= 0 )
             {
-                seg = new Segment( orig.substring( beginning, start ), prev );
+                seg = new Segment( orig.substring( beginning, start ), prev, System.getProperties() );
                 prev = seg;
             }
             int end = orig.indexOf( END_MARK, start );
             if( end >= 0 )
             {
                 String key = orig.substring( start + START_OFFSET, end );
-                String value = p.getProperty( key );
+                String value = properties.getProperty( key );
                 if( value != null )
                 {
-                    seg = new Segment( value, prev );
+                    seg = new Segment( value, prev, System.getProperties() );
                     if( regex != null )
                     {
                         seg.split( regex );
@@ -277,7 +277,7 @@ class Segment
         for( int i = 0; i < l; i++ )
         {
             // Divisions are parallel, they don't preceed or link to each other.
-            divisions[ i ] = new Segment( prop[ i ], null );
+            divisions[ i ] = new Segment( prop[ i ], null, System.getProperties() );
         }
     }
 

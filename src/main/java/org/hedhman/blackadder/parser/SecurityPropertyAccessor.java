@@ -23,7 +23,7 @@ import java.security.Security;
 /**
  * Auxiliary action for accessing specific security property.
  */
-class SecurityPropertyAccessor
+public class SecurityPropertyAccessor
     implements PrivilegedAction<String>
 {
 
@@ -32,16 +32,10 @@ class SecurityPropertyAccessor
     /**
      * Constructor with a property key parameter.
      */
-    SecurityPropertyAccessor( String key )
+    public SecurityPropertyAccessor( String key )
     {
         super();
         this.key = key;
-    }
-
-    PrivilegedAction<String> key( String key )
-    {
-        this.key = key;
-        return this;
     }
 
     /**

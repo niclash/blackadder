@@ -15,11 +15,6 @@
  *  limitations under the License.
  */
 
-/**
- *
- * @version $Revision$
- */
-
 package org.hedhman.blackadder.parser;
 
 import java.io.IOException;
@@ -64,7 +59,7 @@ import java.util.List;
  * This implementation is effectively thread-safe, as it has no field references
  * to data being processed (that is, passes all the data as method parameters).
  *
- * See {@code org.apache.harmony.security.fortress.DefaultPolicyParser}
+ * @see DefaultPolicyParser
  */
 class DefaultPolicyScanner
 {

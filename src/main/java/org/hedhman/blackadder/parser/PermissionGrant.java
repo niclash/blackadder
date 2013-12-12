@@ -55,8 +55,6 @@ import java.util.TreeSet;
  * active Policy can perform PrivilegedAction's, since the Policy caches it's
  * own domain Permissions during initialisation, it doesn't consult
  * PermissionGrant's thereafter.
- *
- * @since 2.2.1
  */
 public abstract class PermissionGrant
 {

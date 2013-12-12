@@ -18,11 +18,12 @@
 package org.hedhman.blackadder.parser;
 
 import java.util.Collection;
-import java.util.Properties;
+import org.hedhman.blackadder.expander.ExpansionFailedException;
+import org.hedhman.blackadder.expander.PropertyExpander;
 
 /**
  * Compound token representing <i>grant </i> clause. See policy format
- * {@code org.apache.river.api.security.ConcurrentPolicyFile } description for details.
+ * {@link org.hedhman.blackadder.ConcurrentPolicyFile } description for details.
  *
  * @see DefaultPolicyParser
  * @see DefaultPolicyScanner
@@ -97,15 +98,11 @@ class GrantEntry
     /**
      * @return the codebase
      */
-    String getCodebase( Properties system )
+    String getCodebase( PropertyExpander propertyExpander )
     {
-        if( system == null )
-        {
-            return codebase;
-        }
         try
         {
-            return PolicyUtils.expand( codebase, system );
+            return propertyExpander.expand( codebase );
         }
         catch( ExpansionFailedException ex )
         {

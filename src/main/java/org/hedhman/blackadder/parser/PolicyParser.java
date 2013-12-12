@@ -20,7 +20,6 @@ package org.hedhman.blackadder.parser;
 
 import java.net.URL;
 import java.util.Collection;
-import java.util.Properties;
 
 /**
  * Based on the Apache Harmony interface of the same name, although not compatible.
@@ -39,12 +38,11 @@ public interface PolicyParser
      * valid reference is initialized and used in processing tokens.
      *
      * @param location an URL of a policy file to be loaded
-     * @param system   system properties, used for property expansion
      *
      * @return a collection of PermissionGrant objects, may be empty
      *
      * @throws Exception IO error while reading location or file syntax error
      */
-    Collection<PermissionGrant> parse( URL location, Properties system )
+    Collection<PermissionGrant> parse( URL location )
         throws Exception;
 }

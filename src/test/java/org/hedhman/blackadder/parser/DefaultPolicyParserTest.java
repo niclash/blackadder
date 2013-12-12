@@ -15,25 +15,27 @@
  *  limitations under the License.
  */
 
-/**
- *
- * @version $Revision$
- */
-
 package org.hedhman.blackadder.parser;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.security.CodeSource;
 import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
 import java.security.Permission;
 import java.security.Principal;
 import java.security.SecurityPermission;
 import java.security.UnresolvedPermission;
 import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -53,17 +55,24 @@ import static org.junit.Assert.fail;
 
 public class DefaultPolicyParserTest
 {
-    private Properties system;
     private GrantEntry ge;
-    private Collection<Permission> permissions;
     private PermissionGrant grant;
     private PermissionEntry pe0, pe1, pe2, pe3;
     private Permission perm0, perm1, perm2, perm3;
 
     @Before
     public void setUp()
+        throws IOException, CertificateException, NoSuchAlgorithmException, KeyStoreException
     {
-        system = new Properties();
+        KeyStore.ProtectionParameter protection = new KeyStore.PasswordProtection( new char[ 0 ] );
+        KeyStore.Builder ksBuilder = KeyStore.Builder.newInstance( "jks", null, protection );
+        KeyStore ks = ksBuilder.getKeyStore();
+        File ksFile = new File( "blackadder.keystore" ).getAbsoluteFile();
+        ksFile.deleteOnExit();
+        OutputStream ksStream = new BufferedOutputStream( new FileOutputStream( ksFile ) );
+        ks.store( ksStream, new char[ 0 ] );
+
+        Properties system = System.getProperties();
         system.setProperty( "com.sun.jini.jsk.home", "/opt/src/river/trunk" );
         system.setProperty( "/", "/" );
         system.setProperty( "com.sun.jini.qa.harness.harnessJar", "/opt/src/river/trunk/qa/lib/harness.jar" );
@@ -97,7 +106,7 @@ public class DefaultPolicyParserTest
         perm3 = new UnresolvedPermission( "permission com.sun.jini.start.SharedActivationPolicyPermission",
                                           "jar:file:/opt/src/river/trunk/qa/lib/harness.jar!/harness/policy/defaultgroup.policy",
                                           "", null );
-        permissions = new ArrayList<Permission>( 4 );
+        Collection<Permission> permissions = new ArrayList<Permission>( 4 );
         permissions.add( perm0 );
         permissions.add( perm1 );
         permissions.add( perm2 );
@@ -119,6 +128,19 @@ public class DefaultPolicyParserTest
             .build();
     }
 
+    @Test
+    public void testGrant()
+        throws Exception
+    {
+        Collection<Permission> permissions = grant.getPermissions();
+        assertThat( permissions.size(), equalTo( 4 ) );
+        Class expected = UnresolvedPermission.class;
+        for( Permission p : permissions )
+        {
+            assertThat( p.getClass(), equalTo( expected ) );
+        }
+    }
+
     /**
      * Tests parsing of a sample policy from temporary file, validates returned
      * PolicyEntries.
@@ -134,21 +156,21 @@ public class DefaultPolicyParserTest
         tmp.deleteOnExit();
 
         FileWriter out = new FileWriter( tmp );
-        out.write( /* "grant{}KeyStore \"url2\", \"jks\" " */
+        out.write( "grant{}KeyStore \"blackadder.keystore\", \"jks\" " +
                    "GRANT signedby \"duke,Li\", codebase\"\", principal a.b.c \"guest\" "
-                   + "{permission XXX \"YYY\", SignedBy \"ZZZ\" \n \t };;;"
+                   + "{permission java.security.SecurityPermission \"XXX\" \"YYY\", SignedBy \"dick\" \n \t };;;"
                    + "GRANT codebase\"http://a.b.c/-\", principal * * "
                    + "{permission java.security.SecurityPermission \"YYY\";}"
                    + "GRANT {permission java.security.SecurityPermission \"ZZZ\";}"
-//                   + "GRANT {permission java.security.RuntimePermission \"*\";}" )
         );
         out.flush();
         out.close();
 
         System.out.println( KeyStore.getDefaultType() );
         DefaultPolicyParser parser = new DefaultPolicyParser();
-        Collection entries = parser.parse( tmp.toURI().toURL(), System.getProperties() );
-        assertThat( entries.size(), equalTo( 2 ) );
+        URL location = tmp.toURI().toURL();
+        Collection entries = parser.parse( location );
+        assertThat( entries.size(), equalTo( 3 ) );
         for( Object entry : entries )
         {
             PermissionGrant element = (PermissionGrant) entry;
@@ -166,6 +188,10 @@ public class DefaultPolicyParserTest
                         (Certificate[]) null ),
                     new Principal[]{ new FakePrincipal( "qqq" ) } ) );
             }
+            else if( permissions.contains( new SecurityPermission( "XXX" ) ) )
+            {
+                assertFalse( element.implies( (CodeSource) null, null ) );
+            }
             else
             {
                 fail( "Extra entry parsed" );
@@ -177,11 +203,13 @@ public class DefaultPolicyParserTest
      * Test of segment method, of class DefaultPolicyParser.
      */
     @Test
-    public void testSegment() throws Exception {
-        System.out.println("segment");
+    public void testSegment()
+        throws Exception
+    {
+        System.out.println( "segment" );
         String s = "${os.name}";
         DefaultPolicyParser instance = new DefaultPolicyParser();
-        Segment result = instance.segment(s, System.getProperties() );
+        Segment result = instance.segment( s );
         assertThat( result.next(), equalTo( System.getProperty( "os.name" ) ) );
     }
 
@@ -189,14 +217,16 @@ public class DefaultPolicyParserTest
      * Test of expandURLs method, of class DefaultPolicyParser.
      */
     @Test
-    public void testExpandURLs() throws Exception {
-        System.out.println("expandURLs");
+    public void testExpandURLs()
+        throws Exception
+    {
+        System.out.println( "expandURLs" );
         System.setProperty( "/", "+" );
         String s = "\"file:${user.name}${/}lib${/}group.jar\"";
-        Properties p = System.getProperties();
         DefaultPolicyParser instance = new DefaultPolicyParser();
-        Collection<String> result = instance.expandURLs(s, p);
-        assertThat(result.iterator().next(), equalTo("\"file:" + System.getProperty( "user.name" ) + "+lib+group.jar\"") );
+        Collection<String> result = instance.expandURLs( s );
+        assertThat( result.iterator()
+                        .next(), equalTo( "\"file:" + System.getProperty( "user.name" ) + "+lib+group.jar\"" ) );
     }
 
     /**
@@ -205,14 +235,12 @@ public class DefaultPolicyParserTest
 //    @Test
 //    public void testResolveGrant() throws Exception {
 //        System.out.println("resolveGrant");
-//        KeyStore ks = null;
-//        boolean resolve = true;
 //        DefaultPolicyParser instance = new DefaultPolicyParser();
 //        PermissionGrant expResult = grant;
-//        PermissionGrant result = instance.resolveGrant(ge, ks, system, resolve);
+//        PermissionGrant result = instance.resolveGrant(ge, null, true );
 //        assertEquals(expResult, result);
 //        // TODO review the generated test code and remove the default call to fail.
-////        fail("The test case is a prototype.");
+//        fail("The test case is a prototype.");
 //    }
 
     /**
@@ -223,20 +251,18 @@ public class DefaultPolicyParserTest
         throws Exception
     {
         System.out.println( "resolvePermission" );
-        KeyStore ks = null;
-        boolean resolve = true;
         DefaultPolicyParser instance = new DefaultPolicyParser();
         Permission expResult = perm0;
-        Permission result = instance.resolvePermission( pe0, ge, ks, system, resolve );
+        Permission result = instance.resolvePermission( pe0, ge, null, true );
         assertThat( result, equalTo( expResult ) );
         expResult = perm1;
-        result = instance.resolvePermission( pe1, ge, ks, system, resolve );
+        result = instance.resolvePermission( pe1, ge, null, true );
         assertThat( result, equalTo( expResult ) );
         expResult = perm2;
-        result = instance.resolvePermission( pe2, ge, ks, system, resolve );
+        result = instance.resolvePermission( pe2, ge, null, true );
         assertThat( result, equalTo( expResult ) );
         expResult = perm3;
-        result = instance.resolvePermission( pe3, ge, ks, system, resolve );
+        result = instance.resolvePermission( pe3, ge, null, true );
         assertThat( result, equalTo( expResult ) );
         // TODO review the generated test code and remove the default call to fail.
 //        fail("The test case is a prototype.");
@@ -273,7 +299,7 @@ public class DefaultPolicyParserTest
 //        // TODO review the generated test code and remove the default call to fail.
 //        fail("The test case is a prototype.");
 //    }
-//
+
 //    /**
 //     * Test of initKeyStore method, of class DefaultPolicyParser.
 //     */
